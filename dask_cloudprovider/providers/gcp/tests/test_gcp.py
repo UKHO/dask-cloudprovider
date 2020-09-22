@@ -59,7 +59,6 @@ async def test_create_cluster(cluster):
     client = Client(cluster, asynchronous=True)  # noqa
     await client
     await client.wait_for_workers(2)
-    breakpoint()
 
     def gpu_mem():
         from pynvml.smi import nvidia_smi

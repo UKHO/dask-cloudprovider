@@ -18,7 +18,7 @@ except ImportError as e:
     msg = (
         "Dask Cloud Provider GCP requirements are not installed.\n\n"
         "Please either conda or pip install as follows:\n\n"
-        "  conda install google-api-python-client                        # either conda install\n"
+        "  conda install -c conda-forge google-api-python-client  # either conda install\n"
         '  python -m pip install "dask-cloudprovider[gcp]" --upgrade  # or python -m pip install'
     )
     raise ImportError(msg) from e
@@ -57,21 +57,7 @@ class GCPInstance(VMInterface):
 
         self.general_zone = '-'.join(self.zone.split('-')[:2])  # us-east1-c -> us-east1
 
-    def create_cloud_init(self):
-        spec = f"""#cloud-config
-packages:
-  - apt-transport-https
-  - ca-certificates
-  - curl
-  - gnupg-agent
-  - software-properties-common
-  - tmux
 
-runcmd:
-  # Run container
-  - docker run --gpus=all --net=host {self.docker_image} {self.command}
-"""
-        return spec
 
     def create_gcp_config(self):
         config = {
@@ -164,7 +150,12 @@ runcmd:
         return config
 
     async def create_vm(self):
-        self.cloud_init = self.create_cloud_init()
+        self.cloud_init =  self.render_cloud_init(
+                    image=self.docker_image,
+                    command=self.command,
+                    gpu_instance=bool(self.ngpus),
+                    bootstrap=False)
+
         self.gcp_config = self.create_gcp_config()
         try:
             inst = (
@@ -309,48 +300,3 @@ class GCPCluster(VMCluster):
         }
         self.scheduler_options = {**self.options}
         self.worker_options = {"worker_command": worker_command, **self.options}
-
-
-# sudo apt-get update
-# sudo apt-get install software-properties-common
-# curl -O https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/cuda-ubuntu1804.pin
-# sudo mv cuda-ubuntu1804.pin /etc/apt/preferences.d/cuda-repository-pin-600
-# sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/7fa2af80.pub
-# sudo add-apt-repository "deb http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/ /"
-# sudo apt-get update
-# sudo apt-get install cuda-toolkit-11-0 cuda
-
-# nvidia-gpu-cloud-image-20200730
-# gcloud compute images list --project=nvidia-ngc-public
-# long wait time for nvidia drivers to install
-# docker pull rapidsai/rapidsai-nightly:0.16-cuda11.0-runtime-ubuntu18.04
-# sudo journalctl -u konlet-startup
-# #! /bin/bash
-# cos-extensions install gpu
-# sudo mount --bind /var/lib/nvidia /var/lib/nvidia
-# sudo mount -o remount,exec /var/lib/nvidia
-# /var/lib/nvidia/bin/nvidia-smi"
-# tail -f /var/log/cloud-init.log /var/log/cloud-init-output.log
-
-"""
-spec:
-  containers:
-    - name: {self.name}
-      image: '{self.docker_image}'
-      command:
-        - {self.command}
-      args:
-        - '--ip=0.0.0.0'
-        - '--no-bokeh'
-      securityContext:
-        privileged: true
-      env:
-        - name: UCX_NVLINK_ENABLED
-          value: 'False'
-      stdin: false
-      tty: false
-  restartPolicy: Always
-
-# This container declaration format is not public API and may change without notice. Please
-# use gcloud command-line tool or Google Cloud Console to run Containers on Google Compute Engine.
-"""
