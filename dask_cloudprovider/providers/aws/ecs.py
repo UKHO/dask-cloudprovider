@@ -719,7 +719,7 @@ class ECSCluster(SpecCluster):
             self._fargate_scheduler = self.config.get("fargate_scheduler")
         if self._fargate_workers is None:
             self._fargate_workers = self.config.get("fargate_workers")
-        if self._fargate_spot is None:
+        if not self._fargate_spot:
             self._fargate_spot = self.config.get("fargate_spot")
         if self._fargate_spot_weight is None:
             self._fargate_spot_weight = self.config.get("fargate_spot_weight")
