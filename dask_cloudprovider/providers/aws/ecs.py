@@ -294,10 +294,25 @@ class Task:
         if self.task:
             async with self._client("ecs") as ecs:
                 await ecs.stop_task(cluster=self.cluster_arn, task=self.task_arn)
-            await self._update_task()
-            while self.task["lastStatus"] in ["RUNNING"]:
-                await asyncio.sleep(1)
+            wait_duration = 1
+            try:
                 await self._update_task()
+                wait_duration = 1
+            except ClientError as e:
+                if e.response["Error"]["Code"] == "ThrottlingException":
+                    wait_duration = wait_duration * 2
+                else:
+                    raise
+            while self.task["lastStatus"] in ["RUNNING"]:
+                try:
+                    await self._update_task()
+                    wait_duration = 1
+                except ClientError as e:
+                    if e.response["Error"]["Code"] == "ThrottlingException":
+                        wait_duration = wait_duration * 2
+                    else:
+                        raise
+                await asyncio.sleep(min(wait_duration, 20))
         self.status = "closed"
 
     @property
